@@ -113,6 +113,7 @@ if __name__ == "__main__":
             solver = Solver()
             solver.autoplay()
         elif raw == 'q' or raw == 'quit':
+            print("Thanks for playing!\n")
             break
         else:
             oops()
