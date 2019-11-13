@@ -16,7 +16,7 @@ class GameState(Enum):
 
 class Board:
     """ 
-        Creates a playable board.
+        Creates a playable board that can be clicked.
     """
 
     def __init__(self, rows, cols):
