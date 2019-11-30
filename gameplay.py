@@ -80,6 +80,11 @@ class Board:
             return " f "
         return " X "
 
+    def as_int(self, square):
+        if square.clicked:
+            return square.mine_neighbors()
+        return None
+
     def pr_endhook(self, square):
         if square.mine:
             return " M "
@@ -140,13 +145,13 @@ class Square:
 
     def mine_neighbors(self):
         return len(list(filter(
-            lambda square: square.mine, [self.board.squares[point[0]][point[1]] for point in self.__point_neighbors()]
+            lambda square: square.mine, [self.board.squares[point[0]][point[1]] for point in self.point_neighbors()]
         )))
 
     def neighbors(self):
-        return [self.board.squares[point[0]][point[1]] for point in self.__point_neighbors()]
+        return [self.board.squares[point[0]][point[1]] for point in self.point_neighbors()]
 
-    def __point_neighbors(self):
+    def point_neighbors(self):
         row_neighbors = list(filter(lambda val: 0 <= val < self.board.rows, [self.row-1, self.row, self.row+1]))
         col_neighbors = list(filter(lambda val: 0 <= val < self.board.cols, [self.col-1, self.col, self.col+1]))
         neighbor_set = set(itertools.product(row_neighbors, col_neighbors))

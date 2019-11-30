@@ -1,5 +1,5 @@
 import sys, os
-from gameplay import Board, GameState
+from gameplay import Board, GameState, Square
 import re
 import time
 import random
@@ -51,7 +51,7 @@ class Game:
         print("> eg. 1, 1")
         print("\nIf you'd like to flag a coordinate, use the following format!")
         print("If you'd like to UNflag, please enter that same coordinate.")
-        print("> f <row>,<column>")
+        print("> f <row>, <column>")
         print("> f 1,1")
 
     def play_again(self):
@@ -60,6 +60,7 @@ class Game:
 
 
 class Solver:
+
     def __init__(self):
         self.game_count = 0
         self.win_count = 0
@@ -70,19 +71,100 @@ class Solver:
         for i in range(10):
             for j in range(10):
                 cell = (i, j)
-                self.possible_coords .append(cell)
+                self.possible_coords.append(cell)
+
+    def on_board(self, tryrow, trycol):
+        return tryrow < 10 and trycol < 10
+
+    def cornered(self, round, neighboring_squares):
+        for n in neighboring_squares:
+            nSq = round.getSq(n[0], n[1])
+
+            edge = 0
+            if round.pr_hook(nSq) == ' 1 ':
+                edge += 1
+
+            if edge >= 2:
+                return True
+            return False
+
 
     def choose_next(self, round):
-        # current random strategy
+        # old random selection strategy
         return random.choice(self.possible_coords)
-        # planning to implement actual strategy after midterms
+
+    def choose_bestnext(self, round):
+        # new optimal selection strategy
+        all_Chance = []
+        
+        for i in self.possible_coords:
+            iSq = round.getSq(i[0], i[1])
+            if round.pr_hook(iSq) == ' . ':
+                all_Chance.append(100)
+            
+            elif round.pr_hook(iSq) == ' X ':
+                percentages = []
+                surroundings = iSq.point_neighbors()
+
+                if self.cornered(round, surroundings):
+                    percentages.append(1)
+                     
+                else:   
+                    for j in surroundings:
+                        if self.on_board(j[0], j[1]):
+                            jSq = round.getSq(j[0], j[1])
+                            if round.as_int(jSq) != None:
+                                count_X = 0
+                                count_F = 0
+                                flag = 0
+                                check = jSq.point_neighbors()
+                                for k in check:
+                                    if self.on_board(k[0], k[1]):
+                                        kSq = round.getSq(k[0], k[1])
+                                        if round.pr_hook(kSq) == ' X ':
+                                            count_X += 1
+                                        elif round.pr_hook(kSq) == ' f ':
+                                            count_F += 1
+                                    
+                                if count_X != 0:
+                                    for k in check:
+                                        if self.on_board(k[0], k[1]):
+                                            kSq = round.getSq(k[0], k[1])
+                                            if kSq == iSq:
+                                                percentages.append((jSq.mine_neighbors() - count_F)/ count_X)
+
+                avg_percent = 0
+                if len(percentages) == 0:
+                    avg_percent = 0.8
+                elif percentages.count(1) != 0:
+                    avg_percent = 1
+                    round.flagSq(i[0], i[1])
+                else:
+                    sum_so_far = 0
+                    for p in percentages:
+                        sum_so_far += p
+                    avg_percent = sum_so_far / len(percentages)
+            
+                all_Chance.append(avg_percent)
+
+            else:
+                all_Chance.append(100)
+
+        sorted_Chances = all_Chance.copy()
+        sorted_Chances.sort()
+
+        best_Choice = all_Chance.index(sorted_Chances[0])
+
+        return self.possible_coords[best_Choice]
 
     def autoplay(self):
         t0 = time.time()
-        while self.game_count < 100000:
+        # while self.game_count < 100000:
+        while self.game_count < 1000:
             round = Board(rows=10, cols=10)
             while round.game_state in [GameState.ongoing, GameState.start]:
-                guess = self.choose_next(round)
+                # guess = self.choose_next(round)            # original guess random cell strategy
+                guess = self.choose_bestnext(round)          # new guess best cell strategy
                 round.click(guess[0], guess[1])
             if round.game_state == GameState.win:
                 self.win_count += 1
@@ -90,7 +172,8 @@ class Solver:
         t1 = time.time()
         timeTaken = int(t1-t0)
         print("\nNumber of games won: " + str(self.win_count) + " out of " + str(self.game_count) + " games.")
-        print("Total time to complete the " + str(self.game_count) + "  attempts: " + str(timeTaken)+ " seconds!\n")
+        print("Total time to complete the " + str(self.game_count) + " attempts: " + str(timeTaken)+ " seconds!\n")
+        print("Average win rate: " + str(((self.win_count / self.game_count) *100)) + "%")
 
 def intro():
     print("\n\n ~~~ Welcome to Minesweeper in Terminal! ~~~")
