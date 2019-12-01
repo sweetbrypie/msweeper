@@ -73,9 +73,6 @@ class Solver:
                 cell = (i, j)
                 self.possible_coords.append(cell)
 
-    def on_board(self, tryrow, trycol):
-        return tryrow < 10 and trycol < 10
-
     def cornered(self, round, neighboring_squares):
         for n in neighboring_squares:
             nSq = round.getSq(n[0], n[1])
@@ -90,11 +87,15 @@ class Solver:
 
 
     def choose_next(self, round):
-        # old random selection strategy
+        """
+        Old random selection strategy.
+        """
         return random.choice(self.possible_coords)
 
     def choose_bestnext(self, round):
-        # new optimal selection strategy
+        """
+        New optimal selection strategy.
+        """
         board_percentage = []
         
         for i in self.possible_coords:
@@ -103,25 +104,23 @@ class Solver:
             if round.pr_hook(iSq) == ' X ':
                 sq_percentage = []
                 surroundings = iSq.point_neighbors()
+  
+                for j in surroundings:
+                    jSq = round.getSq(j[0], j[1])
 
-                if self.cornered(round, surroundings):
-                    sq_percentage.append(1)
-                     
-                else:   
-                    for j in surroundings:
-                        jSq = round.getSq(j[0], j[1])
-                        if round.as_int(jSq) != None:
-                            count_X = 0
-                            count_F = 0
-                            check = jSq.point_neighbors()
-                            for k in check:
-                                kSq = round.getSq(k[0], k[1])
-                                if round.pr_hook(kSq) == ' X ':
-                                    count_X += 1
-                                elif round.pr_hook(kSq) == ' f ':
-                                    count_F += 1  
-                            if count_X != 0:
-                                sq_percentage.append((jSq.mine_neighbors() - count_F)/ count_X)
+                    if round.as_int(jSq) != None:
+                        count_X = 0
+                        count_F = 0
+                        check = jSq.point_neighbors()
+
+                        for k in check:
+                            kSq = round.getSq(k[0], k[1])
+                            if round.pr_hook(kSq) == ' X ':
+                                count_X += 1
+                            elif round.pr_hook(kSq) == ' f ':
+                                count_F += 1  
+                        if count_X != 0:
+                            sq_percentage.append((jSq.mine_neighbors() - count_F)/ count_X)
 
                 avg_percent = 0
                 if len(sq_percentage) == 0:
@@ -149,8 +148,7 @@ class Solver:
 
     def autoplay(self):
         t0 = time.time()
-        # while self.game_count < 100000:
-        while self.game_count < 1000:
+        while self.game_count < 100000:                      # runtime was about 3 hours and 15 minutes
             round = Board(rows=10, cols=10)
             while round.game_state in [GameState.ongoing, GameState.start]:
                 # guess = self.choose_next(round)            # original guess random cell strategy
@@ -160,10 +158,10 @@ class Solver:
                 self.win_count += 1
             self.game_count += 1
         t1 = time.time()
-        timeTaken = int(t1-t0)
+        time_taken = int(t1-t0)
         print("\nNumber of games won: " + str(self.win_count) + " out of " + str(self.game_count) + " games.")
-        print("Total time to complete the " + str(self.game_count) + " attempts: " + str(timeTaken)+ " seconds!\n")
-        print("Average win rate: " + str(((self.win_count / self.game_count) *100)) + "%")
+        print("Total time to complete the " + str(self.game_count) + " attempts: " + str(time_taken)+ " seconds!")
+        print("Average win rate: " + str(((self.win_count / self.game_count) *100)) + "%\n")
 
 def intro():
     print("\n\n ~~~ Welcome to Minesweeper in Terminal! ~~~")
