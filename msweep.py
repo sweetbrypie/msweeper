@@ -95,67 +95,57 @@ class Solver:
 
     def choose_bestnext(self, round):
         # new optimal selection strategy
-        all_Chance = []
+        board_percentage = []
         
         for i in self.possible_coords:
             iSq = round.getSq(i[0], i[1])
-            if round.pr_hook(iSq) == ' . ':
-                all_Chance.append(100)
             
-            elif round.pr_hook(iSq) == ' X ':
-                percentages = []
+            if round.pr_hook(iSq) == ' X ':
+                sq_percentage = []
                 surroundings = iSq.point_neighbors()
 
                 if self.cornered(round, surroundings):
-                    percentages.append(1)
+                    sq_percentage.append(1)
                      
                 else:   
                     for j in surroundings:
-                        if self.on_board(j[0], j[1]):
-                            jSq = round.getSq(j[0], j[1])
-                            if round.as_int(jSq) != None:
-                                count_X = 0
-                                count_F = 0
-                                flag = 0
-                                check = jSq.point_neighbors()
-                                for k in check:
-                                    if self.on_board(k[0], k[1]):
-                                        kSq = round.getSq(k[0], k[1])
-                                        if round.pr_hook(kSq) == ' X ':
-                                            count_X += 1
-                                        elif round.pr_hook(kSq) == ' f ':
-                                            count_F += 1
-                                    
-                                if count_X != 0:
-                                    for k in check:
-                                        if self.on_board(k[0], k[1]):
-                                            kSq = round.getSq(k[0], k[1])
-                                            if kSq == iSq:
-                                                percentages.append((jSq.mine_neighbors() - count_F)/ count_X)
+                        jSq = round.getSq(j[0], j[1])
+                        if round.as_int(jSq) != None:
+                            count_X = 0
+                            count_F = 0
+                            check = jSq.point_neighbors()
+                            for k in check:
+                                kSq = round.getSq(k[0], k[1])
+                                if round.pr_hook(kSq) == ' X ':
+                                    count_X += 1
+                                elif round.pr_hook(kSq) == ' f ':
+                                    count_F += 1  
+                            if count_X != 0:
+                                sq_percentage.append((jSq.mine_neighbors() - count_F)/ count_X)
 
                 avg_percent = 0
-                if len(percentages) == 0:
+                if len(sq_percentage) == 0:
                     avg_percent = 0.8
-                elif percentages.count(1) != 0:
+                elif sq_percentage.count(1) != 0:
                     avg_percent = 1
                     round.flagSq(i[0], i[1])
                 else:
                     sum_so_far = 0
-                    for p in percentages:
+                    for p in sq_percentage:
                         sum_so_far += p
-                    avg_percent = sum_so_far / len(percentages)
+                    avg_percent = sum_so_far / len(sq_percentage)
             
-                all_Chance.append(avg_percent)
+                board_percentage.append(avg_percent)
 
             else:
-                all_Chance.append(100)
+                board_percentage.append(100)
 
-        sorted_Chances = all_Chance.copy()
-        sorted_Chances.sort()
+        sorted_percentages = board_percentage.copy()
+        sorted_percentages.sort()
 
-        best_Choice = all_Chance.index(sorted_Chances[0])
+        best_choice = board_percentage.index(sorted_percentages[0])
 
-        return self.possible_coords[best_Choice]
+        return self.possible_coords[best_choice]
 
     def autoplay(self):
         t0 = time.time()
