@@ -60,7 +60,7 @@ class Solver:
 
     def autoplay(self):
         t0 = time.time()
-        while self.game_count.value < 1000:
+        while self.game_count.value < 100000:
             processes = []
             for _ in range(16):
                 p = Process(target=self.play_round)
