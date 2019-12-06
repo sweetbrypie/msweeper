@@ -1,173 +1,194 @@
-import sys, os
-from gameplay import Board, GameState, Square
-import re
+import sys
+import os
 import time
 import random
+
+from gameplay import Board, GameState
+from multiprocessing import Pool, Value, Process
 
 """ 
     Command Line / Terminal Version of Minesweeper
     - Created by Angelica Quach
 """
 
+
 class Game:
+    """
+    Playable game with user input.
+    """
 
     def __init__(self):
         self.board = Board(rows=10, cols=10)
 
     def play(self):
-        self.welcome()
-        while self.board.game_state in [GameState.ongoing, GameState.start]:
-            self.board.pr_wrapper(self.board.pr_hook)
+        welcome()
+        while self.board.game_state in [GameState.ONGOING, GameState.START]:
+            self.board.print_board(self.board.print_square)
             try:
                 inp = input("> ")
                 line = "".join(inp.split())
                 if line[0] == "f":
-                    point = tuple(map(int, line[1:].split(",")))
-                    self.board.flagSq(point[0], point[1])
+                    point = list(map(int, line[1:].split(",")))
+                    self.board.get_square(point[0], point[1]).flag_square()
                 else:
-                    point = tuple(map(int, line.split(",")))
+                    point = list(map(int, line.split(",")))
                     self.board.click(point[0], point[1])
             except (IndexError, ValueError):
-                self.help()
+                instructions()
             except KeyboardInterrupt:
                 try:
                     sys.exit(0)
                 except SystemExit:
                     os._exit(0)
-        if self.board.game_state == GameState.lose:
+        if self.board.game_state == GameState.LOSE:
             print("\n\nOh no! Better luck next time! You hit a mine.\n")
             print("Here's the solution!\n")
         else:
             print("\n\nYou didn't hit any of the mines! You win!\n")            
-        self.board.pr_wrapper(self.board.pr_endhook)
-
-    def welcome(self):
-        print("\nLet's play Minesweeper in Terminal!")
-        self.help()
-    
-    def help(self):
-        print("\nUse the following format to enter coordinates!")
-        print("> <row>, <column>")
-        print("> eg. 1, 1")
-        print("\nIf you'd like to flag a coordinate, use the following format!")
-        print("If you'd like to UNflag, please enter that same coordinate.")
-        print("> f <row>, <column>")
-        print("> f 1,1")
-
-    def play_again(self):
-        ask = input('Would you like to go again? (y/n): ')
-        return ask.lower() == 'y'
+        self.board.print_board(self.board.print_solution)
 
 
 class Solver:
+    """
+    Plays 100,000 games, keeping track of time and games won.
+    Average win rate is about 90%
+    """
 
     def __init__(self):
-        self.game_count = 0
-        self.win_count = 0
-        self.possible_coords = []
-        self.make_choices()
+        self.game_count = Value('i', 0)
+        self.win_count = Value('i', 0)
 
-    def make_choices(self):
-        for i in range(10):
-            for j in range(10):
-                cell = (i, j)
-                self.possible_coords.append(cell)
+    def autoplay(self):
+        t0 = time.time()
+        while self.game_count.value < 100000:
+            processes = []
+            for _ in range(16):
+                p = Process(target=self.play_round)
+                processes.append(p)
+                p.start()
+            for p in processes:
+                p.join()
+        t1 = time.time()
+        minutes = int((t1-t0) / 60)
+        seconds = int((t1-t0) % 60)
+        print("\nNumber of games won: " + str(self.win_count.value) + " out of " + str(self.game_count.value) + " games.")
+        print("Total time to complete the " + str(self.game_count.value) + " attempts: " + str(minutes) + " minutes and " + str(seconds) + " seconds!")
+        print("Average win rate: " + str(int(((self.win_count.value / self.game_count.value) * 100))) + "%\n")
 
-    def cornered(self, round, neighboring_squares):
-        for n in neighboring_squares:
-            nSq = round.getSq(n[0], n[1])
+    def play_round(self):
+        board = Board(rows=10, cols=10)
+        current_round = Round(board)
+        if current_round.play() == GameState.WIN:
+            self.win_count.value += 1
+        self.game_count.value += 1
 
-            edge = 0
-            if round.pr_hook(nSq) == ' 1 ':
-                edge += 1
 
-            if edge >= 2:
-                return True
-            return False
+class Round:
 
+    def __init__(self, board):
+        self.board = board
+        self.possible_squares = set()
+        self.make_squares()
+        self.found_mines = 0
+
+    def make_squares(self):
+        for r in range(10):
+            for c in range(10):
+                self.possible_squares.add(self.board.get_square(r, c))
 
     def choose_next(self, round):
         """
         Old random selection strategy.
         """
-        return random.choice(self.possible_coords)
+        return random.choice(self.possible_squares)
 
-    def choose_bestnext(self, round):
+    def choose_bestnext(self):
         """
         New optimal selection strategy.
         """
-        board_percentage = []
-        
-        for i in self.possible_coords:
-            iSq = round.getSq(i[0], i[1])
-            
-            if round.pr_hook(iSq) == ' X ':
-                sq_percentage = []
-                surroundings = iSq.point_neighbors()
-  
-                for j in surroundings:
-                    jSq = round.getSq(j[0], j[1])
+        lowest_percent = 100
+        best_choice = None
+        remove_squares = set()
 
-                    if round.as_int(jSq) != None:
-                        count_X = 0
-                        count_F = 0
-                        check = jSq.point_neighbors()
+        for iSq in self.possible_squares:
+            if self.board.is_unknown(iSq):
+                percentages = []
+                neighbors = self.board.get_neighboring_squares(iSq)
 
-                        for k in check:
-                            kSq = round.getSq(k[0], k[1])
-                            if round.pr_hook(kSq) == ' X ':
-                                count_X += 1
-                            elif round.pr_hook(kSq) == ' f ':
-                                count_F += 1  
-                        if count_X != 0:
-                            sq_percentage.append((jSq.mine_neighbors() - count_F)/ count_X)
+                for jSq in neighbors:
+                    if jSq.as_int():
+                        count_x = 0
+                        count_f = 0
+                        check = self.board.get_neighboring_squares(jSq)
+                        for kSq in check:
+                            if self.board.is_unknown(kSq):
+                                count_x += 1
+                            elif kSq.flagged:
+                                count_f += 1
 
-                avg_percent = 0
-                if len(sq_percentage) == 0:
-                    avg_percent = 0.8
-                elif sq_percentage.count(1) != 0:
+                        if count_x != 0:
+                            percentages.append((jSq.as_int() - count_f) / count_x)
+
+                if len(percentages) == 0:
+                    # dividing the number of remaining mines by the number of remaining unknowns
+                    avg_percent = (10 - self.found_mines) / len(self.possible_squares)
+                elif percentages.count(1) != 0:
                     avg_percent = 1
-                    round.flagSq(i[0], i[1])
+                    iSq.flag_square()
+                    self.found_mines += 1
+                    remove_squares.add(iSq)
                 else:
                     sum_so_far = 0
-                    for p in sq_percentage:
+                    for p in percentages:
                         sum_so_far += p
-                    avg_percent = sum_so_far / len(sq_percentage)
-            
-                board_percentage.append(avg_percent)
+                    avg_percent = sum_so_far / len(percentages)
+
+                if avg_percent < lowest_percent:
+                    lowest_percent = avg_percent
+                    best_choice = iSq
 
             else:
-                board_percentage.append(100)
+                remove_squares.add(iSq)
 
-        sorted_percentages = board_percentage.copy()
-        sorted_percentages.sort()
+        best_coords = best_choice.get_coords() if best_choice else (0, 0)
 
-        best_choice = board_percentage.index(sorted_percentages[0])
+        remove_squares.add(best_choice)
+        self.possible_squares = self.possible_squares.difference(remove_squares)
 
-        return self.possible_coords[best_choice]
+        return best_coords
 
-    def autoplay(self):
-        t0 = time.time()
-        while self.game_count < 100000:                      # runtime was about 3 hours and 15 minutes
-            round = Board(rows=10, cols=10)
-            while round.game_state in [GameState.ongoing, GameState.start]:
-                # guess = self.choose_next(round)            # original guess random cell strategy
-                guess = self.choose_bestnext(round)          # new guess best cell strategy
-                round.click(guess[0], guess[1])
-            if round.game_state == GameState.win:
-                self.win_count += 1
-            self.game_count += 1
-        t1 = time.time()
-        time_taken = int(t1-t0)
-        print("\nNumber of games won: " + str(self.win_count) + " out of " + str(self.game_count) + " games.")
-        print("Total time to complete the " + str(self.game_count) + " attempts: " + str(time_taken)+ " seconds!")
-        print("Average win rate: " + str(((self.win_count / self.game_count) *100)) + "%\n")
+    def play(self):
+        while self.board.game_state in [GameState.ONGOING, GameState.START]:
+            guess = self.choose_bestnext()
+            self.board.click(guess[0], guess[1])
+        return self.board.game_state
 
 def intro():
     print("\n\n ~~~ Welcome to Minesweeper in Terminal! ~~~")
     print("\n\nIf you would like to play, please enter 'p' or 'play'.")
     print("If you would like for a solver to play the game for you, \nplease instead enter 's' or 'solver'.")
     print("If you would like to exit, please enter 'q' or 'quit'.\n\n")
+
+
+def welcome():
+    print("\nLet's play Minesweeper in Terminal!")
+    instructions()
+
+
+def instructions():
+    print("\nUse the following format to enter coordinates!")
+    print("> <row>, <column>")
+    print("> eg. 1, 1")
+    print("\nIf you'd like to flag a coordinate, use the following format!")
+    print("If you'd like to UNflag, please enter that same coordinate.")
+    print("> f <row>, <column>")
+    print("> eg. f 1,1")
+
+
+def play_again():
+    ask = input('Would you like to go again? (y/n): ')
+    return ask.lower() == 'y'
+
 
 def oops():
     print("\nOops! Invalid option detected! Let's try again.")
@@ -189,5 +210,5 @@ if __name__ == "__main__":
         else:
             oops()
             continue
-        if not game.play_again():
+        if not play_again():
             break

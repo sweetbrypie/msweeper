@@ -7,11 +7,18 @@ from enum import Enum
     - Created by Angelica Quach
 """
 
+
 class GameState(Enum):
-    start = 0
-    win = 1
-    lose = 2
-    ongoing = 3
+    START = 0
+    WIN = 1
+    LOSE = 2
+    ONGOING = 3
+
+
+class SquareType(Enum):
+    UNKNOWN = ' X '
+    FLAG = ' f '
+    EMPTY = ' . '
 
 
 class Board:
@@ -22,39 +29,42 @@ class Board:
     def __init__(self, rows, cols):
         self.rows = rows
         self.cols = cols
-        self.game_state = GameState.start
+        self.game_state = GameState.START
         self.number_of_mines = 0
         self.max_mines = 10
         self.mines_coords = []
-        self.makeSquares(self.cols, self.rows)
-        self.setMines(self.cols, self.rows, self.max_mines)
+        self.make_board(self.cols, self.rows)
+        self.set_mines(self.cols, self.rows, self.max_mines)
 
     def click(self, row, col):
         """ 
             Clicks the square and, if the square does not contain a mine, also clicks its neighbors that do not contain mines.
         """
-        if not self.validSq(row, col) or self.getSq(row, col).clicked:
+        if not self.is_valid_square(row, col) or self.get_square(row, col).clicked:
             return
         square = self.squares[row][col]
-        if self.game_state == GameState.start:
+        if self.game_state == GameState.START:
             square.mine = False
-            for neighbor in square.neighbors():
+            for neighbor in self.get_neighboring_squares(square):
                 neighbor.mine = False
-            self.game_state = GameState.ongoing
+            self.game_state = GameState.ONGOING
         if square.mine:
-            self.game_state = GameState.lose
+            self.game_state = GameState.LOSE
             return
         square.clicked = True
         if square.mine_neighbors() == 0:
-            for neighbor in square.neighbors():
+            for neighbor in self.get_neighboring_squares(square):
                 if not neighbor.mine:
                     if neighbor.mine_neighbors() == 0:
                         self.click(neighbor.row, neighbor.col)
                     neighbor.clicked = True
         if self.winner():
-            self.game_state = GameState.win
+            self.game_state = GameState.WIN
 
-    def pr_wrapper(self, print_hook):
+    def print_board(self, print_square):
+        """
+        Prints the border of the board, showing the numbers associated with row and column.
+        """
         print("\n")
         col_print = "    "
         for i in range(0, self.cols):
@@ -63,55 +73,77 @@ class Board:
         for i, row in enumerate(self.squares):
             row_print = str(i) + "  "
             for square in row:
-                row_print += print_hook(square)
+                row_print += print_square(square)
             print(row_print + "\n")
 
-    def pr_hook(self, square):
+    def print_square(self, square):
         """
-            Prints the board. If a square is clicked, 
-            print the number of neighboring mines.
-            Else print "X".
+            If the square does not neighbor mines, return a dot.
+            If it does, return the number of mines it neighbors.
+            If the square is flagged, return f.
+            Else, return an unclicked square X.
         """
         if square.clicked:
             if square.mine_neighbors() == 0:
                 return " . "
             return " " + str(square.mine_neighbors()) + " "
-        elif square.flag:
+        elif square.flagged:
             return " f "
         return " X "
-
-    def as_int(self, square):
-        if square.clicked:
-            return square.mine_neighbors()
         return None
 
-    def pr_endhook(self, square):
+    def print_solution(self, square):
         if square.mine:
             return " M "
-        return self.pr_hook(square)
+        return self.print_square(square)
+
+    def get_dimensions(self):
+        return self.rows, self.cols
 
     def winner(self):
+        """
+        Establishes the win condition, where all the remaining unclicked squares
+        on the board must be mines.
+
+        !!  Does  not implement the secondary win mechanic where a player can win
+        a game by correctly flagging all mines.
+        """
         for row in self.squares:
             for square in row:
                 if not square.mine and not square.clicked:
                     return False
         return True
 
-    def getSq(self, row, col):
+    def get_square(self, row, col):
         """ Return the square at the given row and column."""
         return self.squares[row][col]
 
-    def validSq(self, row, col):
+    def is_unknown(self, square):
+        return self.print_square(square) == SquareType.UNKNOWN.value
+
+    def get_neighboring_squares(self, square):
+        assert type(square) is Square
+        r, c = square.get_coords()
+        row_neighbors = list(filter(lambda val: 0 <= val < self.rows, [r - 1, r, r + 1]))
+        col_neighbors = list(filter(lambda val: 0 <= val < self.cols, [c - 1, c, c + 1]))
+        neighbor_set = set(itertools.product(row_neighbors, col_neighbors))
+        neighbor_set.remove((r, c))
+        neighboring_squares = []
+        for coord in neighbor_set:
+            neighboring_squares.append(self.get_square(coord[0], coord[1]))
+        return neighboring_squares
+
+    def is_valid_square(self, row, col):
         return 0 <= row < self.rows and 0 <= col < self.cols
 
-    def makeSquares(self, cols, rows):
+    def make_board(self, cols, rows):
         """
             Create a grid of squares of size rows by cols.
         """
-        self.squares = [[Square(self, row, col, mine = False)
+        self.squares = [[Square(self, row, col)
                         for col in range(cols)] for row in range(rows)]
 
-    def setMines(self, row, col, mines):
+    def set_mines(self, row, col, mines):
         for _ in range(mines):
             cell = get_random(row, col)
             while cell in self.mines_coords:
@@ -123,41 +155,37 @@ class Board:
             self.squares[sq_row][sq_col].mine = True
         return self.mines_coords
 
-    def flagSq(self, row, col):
-        if not self.validSq(row, col) or self.getSq(row, col).clicked:
-            return
-        square = self.squares[row][col]
-        square.flag = not square.flag
-
 
 class Square:
     """
         Represents a single square in the minesweeper board.
         A square may have a mine (or not), may be clicked (or not), and may be flagged (or not).
     """
-    def __init__(self, board, row, col, mine):
+    def __init__(self, board, row, col):
         self.board = board
         self.row = row
         self.col = col
-        self.mine = mine
-        self.flag = False
+        self.mine = False
+        self.flagged = False
         self.clicked = False
 
     def mine_neighbors(self):
+        # filter takes in a function and a list of elements and only returns the elements that
+        # return true through the function
+        # in this case, filtering out all neighbors of self that are NOT mines
         return len(list(filter(
-            lambda square: square.mine, [self.board.squares[point[0]][point[1]] for point in self.point_neighbors()]
+            lambda square: square.mine, self.board.get_neighboring_squares(self)
         )))
 
-    def neighbors(self):
-        return [self.board.squares[point[0]][point[1]] for point in self.point_neighbors()]
+    def get_coords(self):
+        return self.row, self.col
 
-    def point_neighbors(self):
-        row_neighbors = list(filter(lambda val: 0 <= val < self.board.rows, [self.row-1, self.row, self.row+1]))
-        col_neighbors = list(filter(lambda val: 0 <= val < self.board.cols, [self.col-1, self.col, self.col+1]))
-        neighbor_set = set(itertools.product(row_neighbors, col_neighbors))
-        neighbor_set.remove((self.row, self.col))
-        return list(neighbor_set)
+    def as_int(self):
+        if self.clicked:
+            return self.mine_neighbors()
 
+    def flag_square(self):
+        self.flagged = True
 
 def get_random(row, col):
     a = random.randint(0, row - 1)
