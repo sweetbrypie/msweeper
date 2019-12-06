@@ -170,9 +170,6 @@ class Square:
         self.clicked = False
 
     def mine_neighbors(self):
-        # filter takes in a function and a list of elements and only returns the elements that
-        # return true through the function
-        # in this case, filtering out all neighbors of self that are NOT mines
         return len(list(filter(
             lambda square: square.mine, self.board.get_neighboring_squares(self)
         )))

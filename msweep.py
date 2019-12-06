@@ -60,7 +60,7 @@ class Solver:
 
     def autoplay(self):
         t0 = time.time()
-        while self.game_count.value < 100000:
+        while self.game_count.value < 1000:
             processes = []
             for _ in range(16):
                 p = Process(target=self.play_round)
@@ -130,7 +130,6 @@ class Round:
                             percentages.append((jSq.as_int() - count_f) / count_x)
 
                 if len(percentages) == 0:
-                    # dividing the number of remaining mines by the number of remaining unknowns
                     avg_percent = (10 - self.found_mines) / len(self.possible_squares)
                 elif percentages.count(1) != 0:
                     avg_percent = 1
