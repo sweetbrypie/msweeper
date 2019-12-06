@@ -181,7 +181,7 @@ def instructions():
     print("\nIf you'd like to flag a coordinate, use the following format!")
     print("If you'd like to UNflag, please enter that same coordinate.")
     print("> f <row>, <column>")
-    print("> eg. f 1,1")
+    print("> eg. f 1, 1")
 
 
 def play_again():
