@@ -182,7 +182,7 @@ class Square:
             return self.mine_neighbors()
 
     def flag_square(self):
-        self.flagged = True
+        self.flagged = not self.flagged
 
 def get_random(row, col):
     a = random.randint(0, row - 1)
