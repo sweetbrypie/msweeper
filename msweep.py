@@ -19,7 +19,7 @@ class Solver:
     def __init__(self):
         self.game_count = Value('i', 0)
         self.win_count = Value('i', 0)
-        self.max_games = 1000
+        self.max_games = 100000
 
     def autoplay(self):
         t0 = time.time()
@@ -171,12 +171,18 @@ def number_of_mines(rows, cols):
     print("Type 'd' for default mine amount of 10.\n\n")
     try:
         inp = input("> ")
-        if int(inp) < 0 or int(inp) > rows*cols:
+        line = "".join(inp.split())
+        
+        if line[0] == "d":
+            return 10
+        if int(line[0]) < 0 or int(line[0]) > rows*cols:
             raise ValueError
-        return int(inp)
+        return int(line[0])
     except (ValueError):
         default_mines = int(0.1*rows*cols)
-        print("\nInvalid input, distributing " + str(default_mines) + " mines randomly.")
+        if default_mines == 0:
+            default_mines = 1
+        print("\nInvalid input, distributing " + str(default_mines) + " mine(s) randomly.")
         return default_mines
 
 
