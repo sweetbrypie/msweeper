@@ -26,32 +26,34 @@ class Board:
         Creates a playable board that can be clicked.
     """
 
-    def __init__(self, rows, cols):
+    def __init__(self, rows, cols, number_of_mines=10):
         self.rows = rows
         self.cols = cols
         self.game_state = GameState.START
-        self.number_of_mines = 0
-        self.max_mines = 10
+        self.number_of_mines = number_of_mines
         self.mines_coords = []
         self.make_board(self.cols, self.rows)
-        self.set_mines(self.cols, self.rows, self.max_mines)
+        self.set_random_mines(self.cols, self.rows, self.number_of_mines)
 
     def click(self, row, col):
         """ 
             Clicks the square and, if the square does not contain a mine, also clicks its neighbors that do not contain mines.
+            If the first square you click is a mine, instead remove that mine from the game.
         """
-        if not self.is_valid_square(row, col) or self.get_square(row, col).clicked:
+        if not self.is_valid_square(row, col):
+            raise IndexError('Not on the board.')
+        if self.get_square(row, col).clicked:
             return
+        
         square = self.squares[row][col]
+        square.clicked = True
+
         if self.game_state == GameState.START:
             square.mine = False
-            for neighbor in self.get_neighboring_squares(square):
-                neighbor.mine = False
             self.game_state = GameState.ONGOING
         if square.mine:
             self.game_state = GameState.LOSE
             return
-        square.clicked = True
         if square.mine_neighbors() == 0:
             for neighbor in self.get_neighboring_squares(square):
                 if not neighbor.mine:
@@ -90,7 +92,7 @@ class Board:
         elif square.flagged:
             return " f "
         return " X "
-        return None
+        
 
     def print_solution(self, square):
         if square.mine:
@@ -143,17 +145,25 @@ class Board:
         self.squares = [[Square(self, row, col)
                         for col in range(cols)] for row in range(rows)]
 
-    def set_mines(self, row, col, mines):
-        for _ in range(mines):
+    def set_random_mines(self, row, col, number_of_mines):
+        for _ in range(number_of_mines):
             cell = get_random(row, col)
             while cell in self.mines_coords:
                 cell = get_random(row, col)
             self.mines_coords.append(cell)
-        for j in self.mines_coords:
-            sq_row = j[0]
-            sq_col = j[1]
+        for sq in self.mines_coords:
+            sq_row = sq[0]
+            sq_col = sq[1]
             self.squares[sq_row][sq_col].mine = True
-        return self.mines_coords
+
+    def set_mines(self, coords):
+        """
+        Used for testing purposes.
+        """
+        for coord in coords:
+            sq_row = coord[0]
+            sq_col = coord[1]
+            self.squares[sq_row][sq_col].mine = True
 
 
 class Square:
